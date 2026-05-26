@@ -1,0 +1,269 @@
+{
+    "uuid": "7f6dc51c-ca81-4147-931b-fc6b11eb69b9",
+    "lastMigration": 33,
+    "name": "Sage 300 demo",
+    "endpointPrefix": "",
+    "latency": 0,
+    "port": 3001,
+    "hostname": "",
+    "folders": [],
+    "routes": [
+        {
+            "uuid": "74337657-4fb0-4316-9888-d26606d4e7ca",
+            "type": "http",
+            "documentation": "",
+            "method": "get",
+            "endpoint": "ar-invoices",
+            "responses": [
+                {
+                    "uuid": "0fbd4d78-8847-4fbd-8bc4-3d4cf144b7be",
+                    "body": "{\r\n  \"invoices\": [\r\n    {\r\n      \"id\": \"INV-2026-001\",\r\n      \"customer_name\": \"Benchmark Client Corp\",\r\n      \"invoice_number\": \"INV-001\",\r\n      \"pre_tax_amount\": 45000.00,\r\n      \"tax_amount\": 5850.00,\r\n      \"total\": 50850.00,\r\n      \"status\": \"open\",\r\n      \"date\": \"2026-05-12\",\r\n      \"job_number\": \"JOB-001\"\r\n    }\r\n  ]\r\n}",
+                    "latency": 0,
+                    "statusCode": 200,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        },
+        {
+            "uuid": "123ecce8-73b1-449f-a1e1-86d46607c8fa",
+            "type": "http",
+            "documentation": "",
+            "method": "post",
+            "endpoint": "ar-invoices",
+            "responses": [
+                {
+                    "uuid": "4d54e6e1-c7a2-40d5-aec0-dc3394740baf",
+                    "body": "{\r\n  \"id\": \"INV-2026-NEW\",\r\n  \"status\": \"created\",\r\n  \"message\": \"Invoice successfully created in Sage 300\",\r\n  \"invoice_number\": \"{{body 'invoice_number'}}\",\r\n  \"customer_name\": \"{{body 'customer_name'}}\",\r\n  \"total\": \"{{body 'total'}}\"\r\n}",
+                    "latency": 0,
+                    "statusCode": 201,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        },
+        {
+            "uuid": "906d3cda-722a-45ca-8eff-9d375ddf1654",
+            "type": "http",
+            "documentation": "",
+            "method": "put",
+            "endpoint": "ar-invoices/:id",
+            "responses": [
+                {
+                    "uuid": "e95245c0-da84-482a-9d7c-4a103e241834",
+                    "body": "{\r\n  \"id\": \"{{urlParam 'id'}}\",\r\n  \"status\": \"updated\",\r\n  \"message\": \"Invoice updated successfully\"\r\n}",
+                    "latency": 0,
+                    "statusCode": 200,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        },
+        {
+            "uuid": "4817a399-ab82-4ce4-8f83-ebbd38cbc4c7",
+            "type": "http",
+            "documentation": "",
+            "method": "delete",
+            "endpoint": "ar-invoices/:id",
+            "responses": [
+                {
+                    "uuid": "3cdbd62c-b14c-42ae-b634-13e1a61ef637",
+                    "body": "{\r\n  \"id\": \"{{urlParam 'id'}}\",\r\n  \"status\": \"deleted\"\r\n}",
+                    "latency": 0,
+                    "statusCode": 200,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        },
+        {
+            "uuid": "add0ad98-8fb2-4ef8-a899-195394f7a51b",
+            "type": "http",
+            "documentation": "",
+            "method": "get",
+            "endpoint": "ap-invoices",
+            "responses": [
+                {
+                    "uuid": "88f271c3-95f1-456d-b61b-e8758003da17",
+                    "body": "{\r\n  \"invoices\": [\r\n    {\r\n      \"id\": \"AP-2026-001\",\r\n      \"vendor_name\": \"ABC Steel Inc\",\r\n      \"invoice_number\": \"AP-001\",\r\n      \"amount\": 22000.00,\r\n      \"tax\": 2860.00,\r\n      \"status\": \"pending\",\r\n      \"job_number\": \"JOB-001\"\r\n    }\r\n  ]\r\n}",
+                    "latency": 0,
+                    "statusCode": 200,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        },
+        {
+            "uuid": "d4552d67-1908-4de8-b39e-0d3a3418827d",
+            "type": "http",
+            "documentation": "",
+            "method": "get",
+            "endpoint": "health",
+            "responses": [
+                {
+                    "uuid": "5503f80f-e7b4-4001-9166-ef8be10f95d5",
+                    "body": "{\r\n  \"status\": \"ok\",\r\n  \"system\": \"Sage 300 CRE Mock\",\r\n  \"version\": \"23.x\"\r\n}",
+                    "latency": 0,
+                    "statusCode": 200,
+                    "label": "",
+                    "headers": [],
+                    "bodyType": "INLINE",
+                    "filePath": "",
+                    "databucketID": "",
+                    "sendFileAsBody": false,
+                    "rules": [],
+                    "rulesOperator": "OR",
+                    "disableTemplating": false,
+                    "fallbackTo404": false,
+                    "default": true,
+                    "crudKey": "id",
+                    "callbacks": []
+                }
+            ],
+            "responseMode": null,
+            "streamingMode": null,
+            "streamingInterval": 0
+        }
+    ],
+    "rootChildren": [
+        {
+            "type": "route",
+            "uuid": "74337657-4fb0-4316-9888-d26606d4e7ca"
+        },
+        {
+            "type": "route",
+            "uuid": "123ecce8-73b1-449f-a1e1-86d46607c8fa"
+        },
+        {
+            "type": "route",
+            "uuid": "906d3cda-722a-45ca-8eff-9d375ddf1654"
+        },
+        {
+            "type": "route",
+            "uuid": "4817a399-ab82-4ce4-8f83-ebbd38cbc4c7"
+        },
+        {
+            "type": "route",
+            "uuid": "add0ad98-8fb2-4ef8-a899-195394f7a51b"
+        },
+        {
+            "type": "route",
+            "uuid": "d4552d67-1908-4de8-b39e-0d3a3418827d"
+        }
+    ],
+    "proxyMode": false,
+    "proxyHost": "",
+    "proxyRemovePrefix": false,
+    "tlsOptions": {
+        "enabled": false,
+        "type": "CERT",
+        "pfxPath": "",
+        "certPath": "",
+        "keyPath": "",
+        "caPath": "",
+        "passphrase": ""
+    },
+    "cors": true,
+    "headers": [
+        {
+            "key": "Content-Type",
+            "value": "application/json"
+        },
+        {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+        },
+        {
+            "key": "Access-Control-Allow-Methods",
+            "value": "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+        },
+        {
+            "key": "Access-Control-Allow-Headers",
+            "value": "Content-Type, Origin, Accept, Authorization, Content-Length, X-Requested-With"
+        }
+    ],
+    "proxyReqHeaders": [
+        {
+            "key": "",
+            "value": ""
+        }
+    ],
+    "proxyResHeaders": [
+        {
+            "key": "",
+            "value": ""
+        }
+    ],
+    "data": [],
+    "callbacks": []
+}
