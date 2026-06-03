@@ -13,30 +13,43 @@ def get_company_id():
         return
     
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type":  "application/json"
+        "Authorization":       f"Bearer {token}",
+        "Content-Type":        "application/json",
+        "Procore-Api-Version": "v1.0"
     }
     
-    response = requests.get(
+    # Try multiple endpoints — production vs sandbox differ
+    endpoints = [
         f"{BASE_URL}/rest/v1.0/companies",
-        headers=headers
-    )
+        f"{BASE_URL}/rest/v1.1/companies",
+        f"{BASE_URL}/vapid/companies"
+    ]
     
-    print(f"Status: {response.status_code}")
-    
-    if response.status_code == 200:
-        companies = response.json()
-        if isinstance(companies, list):
-            for c in companies:
-                if isinstance(c, dict):
-                    print(f"\n✅ Company: {c.get('name')}")
-                    print(f"   ID: {c.get('id')}")
-                    print(f"\n→ Add to .env: PROCORE_COMPANY_ID={c.get('id')}")
+    for endpoint in endpoints:
+        print(f"\nTrying: {endpoint}")
+        r = requests.get(endpoint, headers=headers)
+        print(f"Status: {r.status_code}")
+        
+        if r.status_code == 200:
+            companies = r.json()
+            if isinstance(companies, list):
+                for c in companies:
+                    if isinstance(c, dict):
+                        print(f"\n✅ Company: {c.get('name')}")
+                        print(f"   ID: {c.get('id')}")
+                        print(f"\n→ Add to .env: PROCORE_COMPANY_ID={c.get('id')}")
+                return
+            elif isinstance(companies, dict):
+                print(f"Response: {companies}")
+                return
+        elif r.status_code == 403:
+            print("403 — App owner restriction, need AGCM credentials")
+            break
         else:
-            print(f"Unexpected format: {companies}")
-    else:
-        print(f"❌ Error: {response.status_code}")
-        print(f"Response: {response.text[:200]}")
+            print(f"Failed: {r.text[:100]}")
+    
+    print("\n❌ Could not retrieve companies")
+    print("Likely need AGCM credentials from Prathmesh")
 
 if __name__ == "__main__":
     get_company_id()

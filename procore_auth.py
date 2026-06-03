@@ -7,15 +7,16 @@ load_dotenv()
 CLIENT_ID     = os.getenv("PROCORE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("PROCORE_CLIENT_SECRET")
 BASE_URL      = os.getenv("PROCORE_BASE_URL")
+OAUTH_URL     = os.getenv("PROCORE_OAUTH_URL")
 
 def get_token():
     print(f"Client ID: {CLIENT_ID[:8]}...")
+    print(f"OAuth URL: {OAUTH_URL}")
     
     response = requests.post(
-        "https://app.procore.com/oauth/token",
+        f"{OAUTH_URL}/oauth/token",
         headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept":        "application/json"
+            "Content-Type": "application/x-www-form-urlencoded"
         },
         data={
             "grant_type":    "client_credentials",
