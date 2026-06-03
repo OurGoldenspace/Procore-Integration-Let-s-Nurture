@@ -1,6 +1,7 @@
 .env
-__pycache__/
-*.pyc
-
 .access_token
 token.txt
+logs/
+__pycache__/
+*.pyc
+.venv/
