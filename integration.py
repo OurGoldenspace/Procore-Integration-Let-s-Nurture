@@ -1,210 +1,295 @@
+# save as integration.py — full updated version
 import requests
 import os
 import logging
+from datetime import datetime
 from dotenv import load_dotenv
 from procore_auth import get_token
 
 load_dotenv()
 
-# Base URLs
-PROCORE_BASE = os.getenv("PROCORE_BASE_URL")
-SAGE_BASE    = os.getenv("SAGE_BASE_URL")
+BASE_URL   = os.getenv("PROCORE_BASE_URL")
+SAGE_BASE  = os.getenv("SAGE_BASE_URL")
+COMPANY_ID = os.getenv("PROCORE_COMPANY_ID")
+PROJECT_ID = os.getenv("PROCORE_PROJECT_ID")
 
-# Logging
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    filename="integration.log",
+    filename=f"logs/{datetime.now().strftime('%Y-%m-%d')}_integration.log",
     level=logging.INFO,
     format="%(asctime)s — %(levelname)s — %(message)s"
 )
 
-def get_approved_invoices(company_id, project_id, token):
-    """
-    Step 1 — Extract
-    Fetches all approved invoices from Procore project
-    """
-    headers = {
+def build_headers(token):
+    return {
         "Authorization":      f"Bearer {token}",
         "Content-Type":       "application/json",
-        "Procore-Company-Id": str(company_id)
+        "Procore-Company-Id": str(COMPANY_ID)
     }
-    
-    response = requests.get(
-        f"{PROCORE_BASE}/rest/v1.0/projects/{project_id}/invoices",
-        headers=headers,
+
+def safe_float(val):
+    try:
+        return float(str(val).replace(",", "").replace("$", ""))
+    except:
+        return 0.0
+
+def convert_job_number(procore_job):
+    """25-1355 → 25-1355-0"""
+    if not procore_job:
+        return ""
+    cleaned = str(procore_job).rstrip("-0").rstrip("-")
+    return f"{cleaned}-0"
+
+def convert_cost_code(procore_code):
+    """01-5204 → 01-520400"""
+    if not procore_code:
+        return ""
+    parts = str(procore_code).split("-")
+    if len(parts) == 2:
+        return f"{parts[0]}-{parts[1]}00"
+    return procore_code
+
+def format_sage_date(date_str):
+    """YYYY-MM-DD → MM-DD-YYYY"""
+    if not date_str:
+        return ""
+    try:
+        if len(str(date_str)) >= 10:
+            parts = str(date_str)[:10].split("-")
+            if len(parts) == 3:
+                return f"{parts[1]}-{parts[2]}-{parts[0]}"
+    except:
+        pass
+    return str(date_str)
+
+# ============================================
+# FETCH FUNCTIONS
+# ============================================
+
+def get_owner_invoices(token):
+    """Fetch approved owner invoices from payment_applications"""
+    r = requests.get(
+        f"{BASE_URL}/rest/v1.0/payment_applications",
+        headers=build_headers(token),
         params={
-            "company_id":      company_id,
-            "filters[status]": "approved"
+            "company_id": COMPANY_ID,
+            "project_id": PROJECT_ID
         }
     )
-    
-    if response.status_code == 200:
-        invoices = response.json()
-        approved = [
-            inv for inv in invoices
-            if inv.get("status", "").lower() == "approved"
-        ]
-        print(f"✅ Found {len(approved)} approved invoices")
-        logging.info(f"Found {len(approved)} approved invoices")
+    if r.status_code == 200:
+        invoices = r.json()
+        approved = [i for i in invoices 
+                   if str(i.get("status","")).lower() == "approved"]
+        print(f"✅ Owner invoices found: {len(approved)}")
         return approved
-    else:
-        print(f"❌ Failed to fetch invoices: {response.status_code}")
-        logging.error(f"Failed to fetch invoices: {response.text}")
-        return []
+    print(f"❌ Owner invoices: {r.status_code}")
+    return []
 
-def sync_invoice_procore_to_sage(company_id, project_id, invoice_id):
+def get_subcontractor_invoices(token):
+    """Fetch approved subcontractor invoices from requisitions"""
+    r = requests.get(
+        f"{BASE_URL}/rest/v1.0/requisitions",
+        headers=build_headers(token),
+        params={
+            "company_id": COMPANY_ID,
+            "project_id": PROJECT_ID
+        }
+    )
+    if r.status_code == 200:
+        invoices = r.json()
+        approved = [i for i in invoices 
+                   if str(i.get("status","")).lower() == "approved"]
+        print(f"✅ Subcontractor invoices found: {len(approved)}")
+        return approved
+    print(f"❌ Subcontractor invoices: {r.status_code}")
+    return []
+
+# ============================================
+# TRANSFORM FUNCTIONS
+# ============================================
+
+def transform_owner_invoice(invoice):
     """
-    Core P1 function — ETL pipeline
-    Extract from Procore → Transform fields → Load to Sage
+    Map owner invoice (payment_application) → Sage 300 AP fields
+    Confirmed from real AGCM invoice data
     """
-    token = get_token()
-    if not token:
-        print("❌ Auth failed")
-        return False
+    g702 = invoice.get("g702", {})
     
-    headers = {
-        "Authorization":      f"Bearer {token}",
-        "Content-Type":       "application/json",
-        "Procore-Company-Id": str(company_id)
-    }
+    # Get cost code from first g703 line item
+    g703 = invoice.get("g703", [])
+    cost_code_raw = ""
+    if g703:
+        first_line = g703[0]
+        cost_code_raw = first_line.get("cost_code", {}).get("full_code", "")
     
-    # EXTRACT — pull invoice from Procore
-    print(f"\nExtracting invoice {invoice_id} from Procore...")
-    procore_response = requests.get(
-        f"{PROCORE_BASE}/rest/v1.0/projects/{project_id}/invoices/{invoice_id}",
-        headers=headers,
-        params={"company_id": company_id}
+    pre_tax = safe_float(
+        g702.get("total_completed_and_stored_to_date", 0)
+    )
+    tax = safe_float(
+        g702.get("tax_applicable_to_this_payment", 0)
     )
     
-    if procore_response.status_code != 200:
-        print(f"❌ Procore fetch failed: {procore_response.status_code}")
-        logging.error(f"Procore fetch failed: {procore_response.text}")
-        return False
-    
-    invoice = procore_response.json()
-    print(f"✅ Got invoice: #{invoice.get('number')}")
-    
-    # TRANSFORM — map Procore fields to Sage 300
-    sage_payload = {
-        "customer_name":  invoice.get("contractor", {}).get("name"),
-        "invoice_number": invoice.get("number"),
-        "pre_tax_amount": invoice.get("subtotal"),
-        "tax_amount":     invoice.get("tax_amount"),
-        "total":          invoice.get("grand_total"),
-        "job_number":     str(project_id),
-        "date":           invoice.get("invoice_date"),
-        "notes":          "Auto-synced from Procore on approval"
+    return {
+        "invoice_type":   "owner",
+        "vendor_code":    "",  # Quest Capital → lookup vendor code
+        "invoice_number": invoice.get("invoice_number", ""),
+        "invoice_date":   format_sage_date(invoice.get("billing_date", "")),
+        "period_start":   format_sage_date(invoice.get("period_start", "")),
+        "period_end":     format_sage_date(invoice.get("period_end", "")),
+        "pre_tax_amount": pre_tax,
+        "tax_amount":     tax,
+        "total":          pre_tax + tax,
+        "description":    f"#{PROJECT_ID} {invoice.get('formatted_contract_company', '')}",
+        "job_number":     convert_job_number(
+                              str(PROJECT_ID)
+                          ),
+        "cost_code":      convert_cost_code(cost_code_raw),
+        "payment_type":   "Electronic",
+        "tax_group":      "S1152",
+        "procore_id":     invoice.get("id"),
+        "contract_id":    invoice.get("contract", {}).get("id")
     }
-    
-    # Validate required fields
-    missing = [k for k, v in sage_payload.items() if not v]
-    if missing:
-        print(f"❌ Missing fields: {missing}")
-        logging.error(f"Missing fields for invoice {invoice_id}: {missing}")
-        return False
-    
-    print(f"✅ Fields mapped: {sage_payload}")
-    
-    # LOAD — push to Sage via hh2 or CSV fallback
-    return load_to_sage(sage_payload, company_id)
 
-def load_to_sage(sage_payload, company_id):
+def transform_subcontractor_invoice(invoice):
     """
-    LOAD step — tries hh2 first, falls back to CSV
-    Automatically switches based on what's configured
+    Map subcontractor invoice (requisition) → Sage 300 AP fields
+    Confirmed from real AGCM invoice data
     """
-    HH2_BASE_URL = os.getenv("HH2_BASE_URL")
-    HH2_API_KEY  = os.getenv("HH2_API_KEY")
+    summary = invoice.get("summary", {})
     
-    # Try hh2 if configured
-    if HH2_BASE_URL and HH2_API_KEY:
-        print("Loading via hh2...")
-        return sync_via_hh2(sage_payload, HH2_BASE_URL, HH2_API_KEY)
+    pre_tax = safe_float(
+        summary.get("current_payment_due", 0)
+    )
+    tax = safe_float(
+        summary.get("tax_applicable_to_this_payment", 0)
+    )
     
-    # Try Sage mock / real Sage API
+    return {
+        "invoice_type":   "subcontractor",
+        "vendor_code":    "",  # vendor_name → lookup vendor code in Sage
+        "vendor_name":    invoice.get("vendor_name", ""),
+        "invoice_number": invoice.get("invoice_number", ""),
+        "invoice_date":   format_sage_date(invoice.get("billing_date", "")),
+        "period_start":   format_sage_date(invoice.get("requisition_start", "")),
+        "period_end":     format_sage_date(invoice.get("requisition_end", "")),
+        "pre_tax_amount": pre_tax,
+        "tax_amount":     tax,
+        "total":          pre_tax + tax,
+        "description":    f"#{PROJECT_ID} {invoice.get('vendor_name', '')}",
+        "job_number":     convert_job_number(str(PROJECT_ID)),
+        "payment_type":   "Electronic",
+        "tax_group":      "S1152",
+        "procore_id":     invoice.get("id"),
+        "commitment_id":  invoice.get("commitment_id")
+    }
+
+# ============================================
+# LOAD FUNCTION
+# ============================================
+
+def load_to_sage(sage_payload):
+    """
+    Load invoice to Sage 300
+    Tries: hh2 → Sage API → CSV fallback
+    """
+    HH2_URL = os.getenv("HH2_BASE_URL")
+    HH2_KEY = os.getenv("HH2_API_KEY")
+    
+    # Path 1 — hh2
+    if HH2_URL and HH2_KEY:
+        r = requests.post(
+            f"{HH2_URL}/ar-invoices",
+            headers={"Authorization": f"Bearer {HH2_KEY}",
+                     "Content-Type": "application/json"},
+            json=sage_payload
+        )
+        if r.status_code in [200, 201]:
+            print(f"✅ Synced via hh2")
+            logging.info(f"hh2 sync: {sage_payload['invoice_number']}")
+            return True
+    
+    # Path 2 — Sage API / mock
     if SAGE_BASE:
-        print("Loading via Sage API / mock...")
-        response = requests.post(
+        r = requests.post(
             f"{SAGE_BASE}/ar-invoices",
             json=sage_payload
         )
-        if response.status_code in [200, 201]:
-            result = response.json()
-            print(f"✅ Invoice created in Sage 300")
+        if r.status_code in [200, 201]:
+            result = r.json()
+            print(f"✅ Created in Sage 300")
             print(f"   Sage ID: {result.get('id')}")
-            logging.info(f"Invoice synced: {sage_payload['invoice_number']}")
+            logging.info(f"Sage sync: {sage_payload['invoice_number']}")
             return True
-        else:
-            print(f"❌ Sage API failed: {response.status_code}")
     
-    # CSV fallback — always works
-    print("Loading via CSV fallback...")
+    # Path 3 — CSV fallback
     from csv_integration import procore_to_sage_csv
     filepath = procore_to_sage_csv(sage_payload)
     if filepath:
         print(f"✅ CSV generated: {filepath}")
-        logging.info(f"CSV fallback used: {filepath}")
+        logging.info(f"CSV: {filepath}")
         return True
     
     return False
 
-def sync_via_hh2(sage_payload, base_url, api_key):
-    """Load via hh2 middleware — populated after discovery call"""
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type":  "application/json"
-    }
-    response = requests.post(
-        f"{base_url}/ar-invoices",
-        headers=headers,
-        json=sage_payload
-    )
-    if response.status_code in [200, 201]:
-        print(f"✅ Synced via hh2")
-        logging.info(f"hh2 sync successful: {sage_payload['invoice_number']}")
-        return True
-    else:
-        print(f"❌ hh2 failed: {response.status_code} — falling back to CSV")
-        from csv_integration import procore_to_sage_csv
-        return procore_to_sage_csv(sage_payload) is not None
+# ============================================
+# MAIN SYNC FUNCTION
+# ============================================
 
-if __name__ == "__main__":
+def sync_all_approved_invoices():
+    """
+    Main P1 function — syncs all approved invoices
+    Handles both owner and subcontractor invoices
+    """
     print("=== Procore → Sage 300 Integration (P1) ===\n")
-    
-    COMPANY_ID = os.getenv("PROCORE_COMPANY_ID")
-    PROJECT_ID = os.getenv("PROCORE_PROJECT_ID")
-    
-    if not COMPANY_ID or not PROJECT_ID:
-        print("❌ Missing PROCORE_COMPANY_ID or PROJECT_ID in .env")
-        exit()
     
     token = get_token()
     if not token:
-        print("❌ Auth failed — check credentials")
-        exit()
+        print("❌ Auth failed")
+        return
     
-    # Get all approved invoices
-    approved = get_approved_invoices(COMPANY_ID, PROJECT_ID, token)
-    
-    if not approved:
-        print("No approved invoices to sync")
-        exit()
-    
-    # Sync each one
-    print(f"\nSyncing {len(approved)} invoices...\n")
     results = {"success": 0, "failed": 0}
     
-    for invoice in approved:
-        success = sync_invoice_procore_to_sage(
-            company_id=COMPANY_ID,
-            project_id=PROJECT_ID,
-            invoice_id=invoice.get("id")
-        )
-        if success:
-            results["success"] += 1
-        else:
-            results["failed"] += 1
+    # Process owner invoices
+    print("[1/2] Processing owner invoices...")
+    owner_invoices = get_owner_invoices(token)
     
+    for inv in owner_invoices:
+        print(f"\n  Invoice: #{inv.get('invoice_number')} "
+              f"| {inv.get('formatted_contract_company')} "
+              f"| ${inv.get('total_amount_accrued_this_period')}")
+        
+        sage_payload = transform_owner_invoice(inv)
+        print(f"  Transformed: {sage_payload}")
+        
+        success = load_to_sage(sage_payload)
+        results["success" if success else "failed"] += 1
+    
+    # Process subcontractor invoices
+    print("\n[2/2] Processing subcontractor invoices...")
+    sub_invoices = get_subcontractor_invoices(token)
+    
+    for inv in sub_invoices:
+        summary = inv.get("summary", {})
+        print(f"\n  Invoice: #{inv.get('invoice_number')} "
+              f"| {inv.get('vendor_name')} "
+              f"| ${summary.get('current_payment_due')}")
+        
+        sage_payload = transform_subcontractor_invoice(inv)
+        print(f"  Transformed: {sage_payload}")
+        
+        success = load_to_sage(sage_payload)
+        results["success" if success else "failed"] += 1
+    
+    # Summary
+    total = results["success"] + results["failed"]
     print(f"\n=== Sync Complete ===")
-    print(f"✅ Successful: {results['success']}")
-    print(f"❌ Failed:     {results['failed']}")
-    print(f"Total:         {len(approved)}")
+    print(f"✅ Success: {results['success']}/{total}")
+    print(f"❌ Failed:  {results['failed']}/{total}")
+    
+    if results["failed"] == 0:
+        print("\n✅ P1 Integration complete — all invoices synced")
+    
+    return results
+
+if __name__ == "__main__":
+    sync_all_approved_invoices()

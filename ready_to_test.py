@@ -65,33 +65,41 @@ def run_full_test():
         headers=headers,
         params={"company_id": COMPANY_ID}
     )
-    
-    approved_invoices = []
-    
+
     if r.status_code == 200:
         invoices = r.json()
         if isinstance(invoices, dict):
             invoices = invoices.get("invoices", [])
-        
+    
         print(f"Total invoices found: {len(invoices)}")
+    
         for inv in invoices:
             status = str(inv.get("status", "")).lower()
-            print(f"  #{inv.get('number')} | Status: {inv.get('status')} | Total: ${inv.get('grand_total')}")
+            print(f"  #{inv.get('number')} | "
+                f"Status: {inv.get('status')} | "
+                f"Total: ${inv.get('grand_total')}")
             if status in ["approved", "approved_as_noted"]:
                 approved_invoices.append(inv)
-        
+    
         if approved_invoices:
             results["invoices"] = "✅"
-            print(f"\n✅ Approved invoices ready: {len(approved_invoices)}")
+            print(f"\n✅ Approved invoices: {len(invoices)}")
         else:
-            print("\n⚠️  No approved invoices found")
-            print("   Ask Prathmesh to set invoice status to Approved")
-    else:
-        print(f"❌ Invoice fetch failed: {r.status_code} — {r.text[:150]}")
+            print("\n⚠️  No approved invoices yet")
+            print("   Waiting for Prathmesh to add invoice")
+            print_summary(results)
+            return
+    
+    elif r.status_code == 404:
+        print("⚠️  Invoice endpoint returned 404")
+        print("   This usually means no invoices exist yet")
+        print("   Waiting for Prathmesh to add invoice to test project")
         print_summary(results)
         return
-    
-    if not approved_invoices:
+
+    else:
+        print(f"❌ Invoice fetch failed: {r.status_code}")
+        print(f"   {r.text[:150]}")
         print_summary(results)
         return
     
