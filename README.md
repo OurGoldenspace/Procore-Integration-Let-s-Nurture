@@ -763,7 +763,7 @@ APD,...   (line item)
 | CFO / Sage Expert | Andrew O'Neill | andrew@agcm.ca | Oversees AP, can create jobs/vendors |
 | AP User | Timie-Lynn Jones | timie@agcm.ca | Day-to-day Sage user |
 | AP User | Stephanie McArdle | stephanie@agcm.ca | Accounting contact |
-| Procore Admin | Prathmesh | prathmesh@agcm.ca | Manages Procore users/permissions |
+| Procore Admin | Prathmesh | prathmesh@agcm.ca | Manages Procore users/permissions | 
 | Procurement | Keith Flynn | keith@agcm.ca | Sales/estimation, requisition approver |
 
 ### LetsNurture Team
@@ -872,5 +872,3 @@ Payment Type: Electronic
 
 ---
 
-**Last Updated:** July 15, 2026  
-**Next Review:** August 15, 2026

@@ -2,7 +2,7 @@
 api_server.py
 =============
 FastAPI server that exposes the Procore → Sage CSV integration
-as a downloadable endpoint for the Teckels platform.
+as a downloadable endpoint for the x platform.
 
 Endpoints:
   GET  /health              — health check
@@ -223,7 +223,7 @@ def list_invoices(project_id: str = Query(None, description="Procore project ID 
 def sync_and_download(project_id: str = Query(None, description="Procore project ID (optional)")):
     """
     Pull approved invoices from Procore, generate Sage 300 CSV, return as download.
-    Teckels calls this → gets a CSV file back immediately.
+    x calls this → gets a CSV file back immediately.
     """
     token    = get_token()
     invoices = fetch_approved_invoices(token, project_id)

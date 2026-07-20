@@ -83,8 +83,41 @@ def apply_sage_transforms(extracted, raw_job=None, raw_cost="01-5204"):
 
 def generate_sage_csv(invoices):
     """
-    Generate Sage 300 CRE CSV format (API + APD records).
-    Returns CSV content as string.
+    Generate Sage 300 CRE CSV format per Accounts Payable Import Invoices Format Journal.
+    
+    API Record (Invoice Header) Fields:
+    1. Record ID (API)
+    2. Vendor (Alpha 10)
+    3. Invoice# (Alpha 13)
+    4. Invoice Date (Date)
+    5. Due Date (Date)
+    6. Description (Alpha 30)
+    7. Amount (Numeric -7.2)
+    8. Tax Amount (Numeric -7.2)
+    9. Invoice Code1 (Alpha 10)
+    10. Smmry Payee Name (Alpha 30)
+    11-18. Smmry Payee Address fields (Alpha 33 each)
+    
+    APD Record (Line Item) Fields:
+    1. ADD (Record type)
+    2. Assignment (Alpha 12)
+    3. Comment Line Item (Alpha 5)
+    4. Description (Alpha 30)
+    5. Cat1 (Alpha 10)
+    6. Cost Code (Alpha 9)
+    7. Amount (Numeric -7.2)
+    8. Standard Item (Alpha 13)
+    9. Expense Account (Alpha 11)
+    10. Expense Account (Alpha 11)
+    11. Tax Group (Numeric 5)
+    12. Holds (Numeric -4.4)
+    13. Amount (Numeric -7.2)
+    14. Tax (Numeric -7.2)
+    15. Rebatch (Numeric -7.2)
+    16. Exem Exempt (Checkboxes)
+    17. Debit (Alpha 15)
+    18. Debit Purpose (Alpha 30)
+    19. Default Payment Type (Multi Sel) [1=Cheque, 2=Electronic]
     """
     csv_lines = []
     
@@ -98,7 +131,7 @@ def generate_sage_csv(invoices):
         inv_date = inv.get("date", "")
         due_date = inv.get("due_date", "")
         job = inv.get("job_number", "")
-        cost_code = inv.get("cost_code", "01-5204-00")
+        cost_code = inv.get("cost_code", "01-520400")
         tax_group = inv.get("tax_group", "S1152")
         
         # Format dates (YYYY-MM-DD → MM/DD/YYYY for Sage)
@@ -111,48 +144,53 @@ def generate_sage_csv(invoices):
             pass
         
         # ─────────────────────────────────────────────────────
-        # API Record (Invoice Header)
+        # API Record (Invoice Header) - 18 fields
         # ─────────────────────────────────────────────────────
         api_record = [
-            "API",                      # Record type
-            "",                         # Filler
-            invoice_num,                # Invoice number
-            f"#{job} {vendor_name}",    # Description (concatenated)
-            f"{pre_tax:.2f}",          # Pre-tax amount
-            f"{tax:.2f}",              # Tax amount
-            "0",                        # Discount (default 0)
-            inv_date,                   # Invoice date
-            due_date,                   # Due date
-            "",                         # Filler
-            inv_date,                   # GL Date
+            "API",                      # 1. Record ID
+            vendor_code[:10],           # 2. Vendor (10 chars max)
+            invoice_num[:13],           # 3. Invoice# (13 chars max)
+            inv_date,                   # 4. Invoice Date
+            due_date,                   # 5. Due Date
+            f"#{job} {vendor_name}"[:30],  # 6. Description (30 chars max)
+            f"{pre_tax:.2f}",          # 7. Amount (pre-tax)
+            f"{tax:.2f}",              # 8. Tax Amount
+            "",                         # 9. Invoice Code1 (optional)
+            vendor_name[:30],           # 10. Smmry Payee Name (30 chars max)
+            "",                         # 11. Smmry Payee Address 1
+            "",                         # 12. Smmry Payee Address 2
+            "",                         # 13. Smmry Payee City
+            "",                         # 14. Smmry Payee State
+            "",                         # 15. Smmry Payee ZIP
+            "",                         # 16. Smmry Payee Country
+            "",                         # 17. Smmry Payee Phone
+            "2",                        # 18. Default Payment Type (2=Electronic)
         ]
         csv_lines.append(",".join(api_record))
         
         # ─────────────────────────────────────────────────────
-        # APD Record (Invoice Detail/Line Item)
+        # APD Record (Line Item) - 19 fields
         # ─────────────────────────────────────────────────────
         apd_record = [
-            "APD",                      # Record type
-            "",                         # Filler
-            "",                         # Filler
-            cost_code,                  # Cost code (job-division-item format)
-            "",                         # Filler x3
-            "",
-            "",
-            "",                         # Filler
-            "",                         # Filler
-            tax_group,                  # Tax group (e.g., S1152 for HST)
-            "",                         # Filler
-            "",                         # Filler
-            f"{pre_tax:.2f}",          # Detail amount (pre-tax)
-            f"{tax:.2f}",              # Tax amount
-            "0",                        # Discount
-            "",                         # Filler x4
-            "",
-            "",
-            f"#{job} {vendor_name}",    # Description
-            "",                         # Filler
-            "2",                        # Line count/sequence
+            "APD",                      # 1. Record type (ADD/APD)
+            "",                         # 2. Assignment (optional)
+            "",                         # 3. Comment Line Item (optional)
+            f"#{job} {vendor_name}"[:30],  # 4. Description (30 chars max)
+            "",                         # 5. Cat1 (optional)
+            cost_code[:9],              # 6. Cost Code (9 chars max)
+            f"{pre_tax:.2f}",          # 7. Amount (pre-tax)
+            "",                         # 8. Standard Item (optional)
+            "",                         # 9. Expense Account 1 (optional)
+            "",                         # 10. Expense Account 2 (optional)
+            tax_group,                  # 11. Tax Group
+            "0",                        # 12. Holds (default 0)
+            f"{pre_tax:.2f}",          # 13. Amount (pre-tax)
+            f"{tax:.2f}",              # 14. Tax
+            "0",                        # 15. Rebatch (default 0)
+            "",                         # 16. Exempt checkboxes (optional)
+            "",                         # 17. Debit (optional)
+            "",                         # 18. Debit Purpose (optional)
+            "2",                        # 19. Default Payment Type (2=Electronic)
         ]
         csv_lines.append(",".join(apd_record))
     
